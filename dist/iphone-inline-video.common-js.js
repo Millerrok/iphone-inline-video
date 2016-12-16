@@ -1,24 +1,66 @@
-import Symbol from 'poor-mans-symbol';
-import {frameIntervalometer} from 'intervalometer';
-import preventEvent from './lib/prevent-event';
-import proxyProperty from './lib/proxy-property';
-import proxyEvent from './lib/proxy-event';
-import dispatchEventAsync from './lib/dispatch-event-async';
+/*! npm.im/iphone-inline-video */
+'use strict';
+
+function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+
+var Symbol = _interopDefault(require('poor-mans-symbol'));
+var intervalometer = require('intervalometer');
+
+function preventEvent(element, eventName, toggleProperty, preventWithProperty) {
+	function handler(e) {
+		if (Boolean(element[toggleProperty]) === Boolean(preventWithProperty)) {
+			e.stopImmediatePropagation();
+			// console.log(eventName, 'prevented on', element);
+		}
+		delete element[toggleProperty];
+	}
+	element.addEventListener(eventName, handler, false);
+
+	// Return handler to allow to disable the prevention. Usage:
+	// const preventionHandler = preventEvent(el, 'click');
+	// el.removeEventHandler('click', preventionHandler);
+	return handler;
+}
+
+function proxyProperty(object, propertyName, sourceObject, copyFirst) {
+	function get() {
+		return sourceObject[propertyName];
+	}
+	function set(value) {
+		sourceObject[propertyName] = value;
+	}
+
+	if (copyFirst) {
+		set(object[propertyName]);
+	}
+
+	Object.defineProperty(object, propertyName, {get: get, set: set});
+}
+
+function proxyEvent(object, eventName, sourceObject) {
+	sourceObject.addEventListener(eventName, function () { return object.dispatchEvent(new Event(eventName)); });
+}
+
+function dispatchEventAsync(element, type) {
+	Promise.resolve().then(function () {
+		element.dispatchEvent(new Event(type));
+	});
+}
 
 // iOS 10 adds support for native inline playback + silent autoplay
-const isWhitelisted = /iPhone|iPod|iPad/i.test(navigator.userAgent) && !matchMedia('(-webkit-video-playable-inline)').matches;
+var isWhitelisted = /iPhone|iPod|iPad/i.test(navigator.userAgent) && !matchMedia('(-webkit-video-playable-inline)').matches;
 
-const ಠ = Symbol();
-const ಠevent = Symbol();
-const ಠplay = Symbol('nativeplay');
-const ಠpause = Symbol('nativepause');
+var ಠ = Symbol();
+var ಠevent = Symbol();
+var ಠplay = Symbol('nativeplay');
+var ಠpause = Symbol('nativepause');
 
 /**
  * UTILS
  */
 
 function getAudioFromVideo(video) {
-	const audio = new Audio();
+	var audio = new Audio();
 	proxyEvent(video, 'play', audio);
 	proxyEvent(video, 'playing', audio);
 	proxyEvent(video, 'pause', audio);
@@ -35,9 +77,9 @@ function getAudioFromVideo(video) {
 	return audio;
 }
 
-const lastRequests = [];
-let requestIndex = 0;
-let lastTimeupdateEvent;
+var lastRequests = [];
+var requestIndex = 0;
+var lastTimeupdateEvent;
 
 function setTime(video, time, rememberOnly) {
 	// allow one timeupdate event every 200+ ms
@@ -56,7 +98,7 @@ function isPlayerEnded(player) {
 }
 
 function update(timeDiff) {
-	const player = this;
+	var player = this;
 	// console.log('update', player.video.readyState, player.video.networkState, player.driver.readyState, player.driver.networkState, player.driver.paused);
 	if (player.video.readyState >= player.video.HAVE_FUTURE_DATA) {
 		if (!player.hasAudio) {
@@ -90,8 +132,8 @@ function update(timeDiff) {
 
 function play() {
 	// console.log('play');
-	const video = this;
-	const player = video[ಠ];
+	var video = this;
+	var player = video[ಠ];
 
 	// if it's fullscreen, use the native player
 	if (video.webkitDisplayingFullscreen) {
@@ -130,8 +172,8 @@ function play() {
 }
 function pause(forceEvents) {
 	// console.log('pause');
-	const video = this;
-	const player = video[ಠ];
+	var video = this;
+	var player = video[ಠ];
 
 	player.driver.pause();
 	player.updater.stop();
@@ -162,16 +204,16 @@ function pause(forceEvents) {
  */
 
 function addPlayer(video, hasAudio) {
-	const player = video[ಠ] = {};
+	var player = video[ಠ] = {};
 	player.paused = true; // track whether 'pause' events have been fired
 	player.hasAudio = hasAudio;
 	player.video = video;
-	player.updater = frameIntervalometer(update.bind(player));
+	player.updater = intervalometer.frameIntervalometer(update.bind(player));
 
 	if (hasAudio) {
 		player.driver = getAudioFromVideo(video);
 	} else {
-		video.addEventListener('canplay', () => {
+		video.addEventListener('canplay', function () {
 			if (!video.paused) {
 				// console.log('oncanplay');
 				dispatchEventAsync(video, 'playing');
@@ -181,10 +223,10 @@ function addPlayer(video, hasAudio) {
 			src: video.src || video.currentSrc || 'data:',
 			muted: true,
 			paused: true,
-			pause: () => {
+			pause: function () {
 				player.driver.paused = true;
 			},
-			play: () => {
+			play: function () {
 				player.driver.paused = false;
 				// media automatically goes to 0 if .play() is called when it's done
 				if (isPlayerEnded(player)) {
@@ -198,9 +240,9 @@ function addPlayer(video, hasAudio) {
 	}
 
 	// .load() causes the emptied event
-	video.addEventListener('emptied', () => {
+	video.addEventListener('emptied', function () {
 		// console.log('driver src is', player.driver.src);
-		const wasEmpty = !player.driver.src || player.driver.src === 'data:';
+		var wasEmpty = !player.driver.src || player.driver.src === 'data:';
 		if (player.driver.src && player.driver.src !== video.src) {
 			// console.log('src changed to', video.src);
 			setTime(video, 0, true);
@@ -215,7 +257,7 @@ function addPlayer(video, hasAudio) {
 	}, false);
 
 	// stop programmatic player when OS takes over
-	video.addEventListener('webkitbeginfullscreen', () => {
+	video.addEventListener('webkitbeginfullscreen', function () {
 		if (!video.paused) {
 			// make sure that the <audio> and the syncer/updater are stopped
 			video.pause();
@@ -230,14 +272,14 @@ function addPlayer(video, hasAudio) {
 		}
 	});
 	if (hasAudio) {
-		video.addEventListener('webkitendfullscreen', () => {
+		video.addEventListener('webkitendfullscreen', function () {
 			// sync audio to new video position
 			player.driver.currentTime = video.currentTime;
 			// console.assert(player.driver.currentTime === video.currentTime, 'Audio not synced');
 		});
 
 		// allow seeking
-		video.addEventListener('seeking', () => {
+		video.addEventListener('seeking', function () {
 			if (lastRequests.indexOf(video.currentTime * 100 | 0 / 100) < 0) {
 				// console.log('User-requested seeking');
 				player.driver.currentTime = video.currentTime;
@@ -247,7 +289,7 @@ function addPlayer(video, hasAudio) {
 }
 
 function overloadAPI(video) {
-	const player = video[ಠ];
+	var player = video[ಠ];
 	video[ಠplay] = video.play;
 	video[ಠpause] = video.pause;
 	video.play = play;
@@ -263,7 +305,10 @@ function overloadAPI(video) {
 	preventEvent(video, 'ended', ಠevent, false); // prevent occasional native ended events
 }
 
-function enableInlineVideo(video, hasAudio = true, onlyWhitelisted = true) {
+function enableInlineVideo(video, hasAudio, onlyWhitelisted) {
+	if ( hasAudio === void 0 ) hasAudio = true;
+	if ( onlyWhitelisted === void 0 ) onlyWhitelisted = true;
+
 	if ((onlyWhitelisted && !isWhitelisted) || video[ಠ]) {
 		return;
 	}
@@ -280,4 +325,4 @@ function enableInlineVideo(video, hasAudio = true, onlyWhitelisted = true) {
 
 enableInlineVideo.isWhitelisted = isWhitelisted;
 
-export default enableInlineVideo;
+module.exports = enableInlineVideo;
